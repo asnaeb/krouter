@@ -20,8 +20,6 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    linuxX64()
-
     jvm()
 
     js {
@@ -55,13 +53,13 @@ kotlin {
     sourceSets {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            implementation(libs.ui.test)
             implementation(libs.kotlinx.coroutines.test)
 
         }
 
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)
+            implementation(libs.ui.test)
             implementation(libs.kotlinx.coroutinesSwing)
         }
     }
