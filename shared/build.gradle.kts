@@ -20,6 +20,8 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
+    linuxX64()
+
     jvm()
 
     js {
@@ -36,9 +38,17 @@ kotlin {
     }
 
     android {
-        namespace = "io.github.asnaeb.krouter.shared"
+        namespace = "io.github.asnaeb.krouter"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+
+        withJava()
+
+        withHostTestBuilder {  }.configure {  }
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }
 
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
