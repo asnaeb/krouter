@@ -6,11 +6,10 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.NavDisplay
-import io.github.asnaeb.krouter.SharedCommonTest.Destination
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 
-class SharedCommonTest {
+class JvmTest {
     @Serializable
     sealed interface Destination : NavKey
 
@@ -36,6 +35,8 @@ class SharedCommonTest {
         }
     }
 
+    val navigator get() = Navigator<Destination>()
+
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun testApp() = runComposeUiTest {
@@ -46,12 +47,10 @@ class SharedCommonTest {
             )
 
             LaunchedEffect(Unit) {
-                navi.navigate(Dest2)
+                navigator.navigate { add(Dest2) }
             }
         }
 
         awaitIdle()
     }
 }
-
-val navi get() = Navigator<Destination>()

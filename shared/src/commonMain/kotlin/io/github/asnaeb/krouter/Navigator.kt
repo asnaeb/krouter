@@ -171,6 +171,7 @@ class Navigator<Destination : NavKey> private constructor(
             return Navigator(backStack, limit).also { instances[clz] = it }
         }
 
+        @Suppress("UNCHECKED_CAST")
         operator fun <T : NavKey> invoke(clz: KClass<T>): Navigator<T> = (instances[clz] ?: error(clz)) as Navigator<T>
 
         inline operator fun <reified T : NavKey> invoke(): Navigator<T> = Navigator(T::class)

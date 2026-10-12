@@ -20,21 +20,17 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    linuxX64()
-
     jvm()
 
     js {
-        binaries.executable()
         browser()
-        nodejs()
+        binaries.executable()
     }
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        binaries.executable()
         browser()
-        nodejs()
+        binaries.executable()
     }
 
     android {
@@ -43,12 +39,6 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
 
         withJava()
-
-        withHostTestBuilder {  }.configure {  }
-
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }
 
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
@@ -59,6 +49,8 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.ui.test)
+            implementation(libs.kotlinx.coroutines.test)
+
         }
 
         jvmTest.dependencies {
@@ -70,6 +62,7 @@ kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     dependencies {
         implementation(libs.compose.runtime)
+        implementation(libs.compose.ui)
         implementation(libs.jetbrains.navigation3.ui)
         implementation(libs.kotlinx.serialization.json)
     }
