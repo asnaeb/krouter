@@ -40,6 +40,11 @@ kotlin {
 
         withJava()
 
+        withHostTestBuilder {}.configure {}
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }
+
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
         }
