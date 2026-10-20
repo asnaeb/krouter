@@ -14,7 +14,7 @@ plugins {
 val projectName = "krouter"
 
 group = "io.github.asnaeb"
-version = "0.0.1"
+version = "0.0.2"
 
 kotlin {
     iosArm64()
@@ -39,11 +39,6 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
 
         withJava()
-
-        withHostTestBuilder {}.configure {}
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }
 
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11

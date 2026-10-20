@@ -15,18 +15,18 @@ interface DestinationEntry<T : NavKey> {
     val type: KType
     val loader: (suspend (T) -> Unit)?
     val content: @Composable (T) -> Unit
-    val metadata: Map<String, Any>
+    val metadata: (T) -> Map<String, Any>
 }
 
 inline fun <reified T : NavKey> destination(
-    metadata: Map<String, Any> = emptyMap(),
+    noinline metadata: (T) -> Map<String, Any> = { emptyMap() },
     noinline loader: (suspend (T) -> Unit)? = null,
     noinline content: @Composable (T) -> Unit
 ) = object : DestinationEntry<T> {
     override val clz: KClass<T> = T::class
     override val type: KType = typeOf<T>()
     override val loader: (suspend (T) -> Unit)? = loader
-    override val metadata: Map<String, Any> = metadata
+    override val metadata: (T) -> Map<String, Any> = metadata
     override val content: @Composable (T) -> Unit = content
 }
 
