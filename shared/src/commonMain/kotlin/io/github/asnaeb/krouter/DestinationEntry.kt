@@ -29,7 +29,7 @@ inline fun <reified T : NavKey> destination(
 )
 
 inline fun <reified T : NavKey> destination(
-    noinline metadata: (T) -> Map<String, Any> = { emptyMap() },
+    noinline metadata: (T) -> Map<String, Any>,
     noinline loader: (suspend (T) -> Unit)? = null,
     noinline content: @Composable (T) -> Unit
 ) = object : DestinationEntry<T> {
