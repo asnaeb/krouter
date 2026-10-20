@@ -19,6 +19,16 @@ interface DestinationEntry<T : NavKey> {
 }
 
 inline fun <reified T : NavKey> destination(
+    metadata: Map<String, Any> = emptyMap(),
+    noinline loader: (suspend (T) -> Unit)? = null,
+    noinline content: @Composable (T) -> Unit
+) = destination(
+    metadata = { metadata },
+    loader = loader,
+    content = content
+)
+
+inline fun <reified T : NavKey> destination(
     noinline metadata: (T) -> Map<String, Any> = { emptyMap() },
     noinline loader: (suspend (T) -> Unit)? = null,
     noinline content: @Composable (T) -> Unit
