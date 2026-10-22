@@ -1,6 +1,5 @@
 package io.github.asnaeb.krouter
 
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -8,9 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.NavDisplay
-import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
-import kotlin.reflect.KClass
 import kotlin.test.Test
 
 class JvmTest {

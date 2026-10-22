@@ -14,7 +14,7 @@ plugins {
 val projectName = "krouter"
 
 group = "io.github.asnaeb"
-version = "0.0.3"
+version = "0.1.0"
 
 kotlin {
     iosArm64()

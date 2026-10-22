@@ -5,7 +5,6 @@ import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.MetadataScope
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KClass

@@ -5,7 +5,6 @@ import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
-import kotlin.reflect.KClass
 
 @Composable
 inline fun <reified T : NavKey> rememberEntryProvider(
