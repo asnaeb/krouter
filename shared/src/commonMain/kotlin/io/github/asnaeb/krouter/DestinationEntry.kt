@@ -2,54 +2,87 @@ package io.github.asnaeb.krouter
 
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.MetadataScope
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KClass
-import kotlin.reflect.KType
-import kotlin.reflect.typeOf
 
 interface DestinationEntry<T : NavKey> {
-    val clz: KClass<T>
-    val type: KType
-    val loader: (suspend (T) -> Unit)?
-    val content: @Composable (T) -> Unit
-    val metadata: (T) -> Map<String, Any>
+    val clazz: KClass<T>
+
+    suspend fun loader(destination: T) {}
+
+    @Composable
+    fun Content(destination: T) {}
+
+
+    fun metadata(destination: T): Map<String, Any> = emptyMap()
 }
 
-inline fun <reified T : NavKey> destination(
-    metadata: Map<String, Any> = emptyMap(),
-    noinline loader: (suspend (T) -> Unit)? = null,
-    noinline content: @Composable (T) -> Unit
-) = destination(
-    metadata = { metadata },
-    loader = loader,
-    content = content
-)
+@DslMarker
+annotation class DestinationEntryDsl
 
-inline fun <reified T : NavKey> destination(
-    noinline metadata: (T) -> Map<String, Any>,
-    noinline loader: (suspend (T) -> Unit)? = null,
-    noinline content: @Composable (T) -> Unit
-) = object : DestinationEntry<T> {
-    override val clz: KClass<T> = T::class
-    override val type: KType = typeOf<T>()
-    override val loader: (suspend (T) -> Unit)? = loader
-    override val metadata: (T) -> Map<String, Any> = metadata
-    override val content: @Composable (T) -> Unit = content
+@DestinationEntryDsl
+class DestinationEntryBuilder<T : NavKey>(override val clazz: KClass<T>) : DestinationEntry<T> {
+    private var _loader: (suspend (T) -> Unit)? = null
+
+    private var _content: @Composable ((T) -> Unit) = {}
+
+    private var _metadata: (T) -> Map<String, Any> = { emptyMap() }
+
+    fun loader(loader: suspend (T) -> Unit) {
+        _loader = loader
+    }
+
+    fun content(content: @Composable (T) -> Unit) {
+        _content = content
+    }
+
+    fun metadata(metadata: (T) -> Map<String, Any>) {
+        _metadata = metadata
+    }
+
+    fun buildMetadata(builder: MetadataScope.(T) -> Unit) {
+        _metadata = { androidx.navigation3.runtime.metadata { builder(it) } }
+    }
+
+    @Composable
+    override fun Content(destination: T) {
+        _content(destination)
+    }
+
+    override suspend fun loader(destination: T) {
+        _loader?.invoke(destination)
+    }
+
+    override fun metadata(destination: T): Map<String, Any> {
+        return _metadata(destination)
+    }
+}
+
+inline fun <reified T : NavKey> destination(block: DestinationEntryBuilder<T>.() -> Unit): DestinationEntry<T> {
+    return DestinationEntryBuilder(T::class).apply(block)
 }
 
 @OptIn(InternalSerializationApi::class)
-fun <P : NavKey, T : P> DestinationEntry<T>.registerEntry(navigator: Navigator<P>, scope: EntryProviderScope<P>) {
-    loader?.let { loader ->
-        navigator.registerDestination(clz) { loader(it) }
-    }
+fun <P : NavKey, T : P> DestinationEntry<T>.registerEntry(
+    navigator: Navigator<P>,
+    scope: EntryProviderScope<P>
+) {
+    navigator.registerDestination(clazz, ::loader)
 
     scope.addEntryProvider(
-        clazz = clz,
-        metadata = metadata,
-        clazzContentKey = { Json.encodeToString(JsonNavEntry.serializer(clz.serializer()), JsonNavEntry(it)) },
-        content = content
+        clazz = clazz,
+        metadata = ::metadata,
+        clazzContentKey = {
+            Json.encodeToString(
+                JsonNavEntry.serializer(clazz.serializer()),
+                JsonNavEntry(it)
+            )
+        },
+        content = ::Content
     )
 }

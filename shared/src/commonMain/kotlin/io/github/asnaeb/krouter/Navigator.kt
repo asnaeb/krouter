@@ -75,7 +75,9 @@ class Navigator<Destination : NavKey> private constructor(
 
         val newDestinations: List<Destination> = new.filter { it !in backStack }
 
-        scope.launch {
+        job?.cancel()
+
+        job = scope.launch {
             coroutineScope {
                 newDestinations.forEach { destination ->
                     data[destination::class]?.beforeNavigate?.let { loader ->
