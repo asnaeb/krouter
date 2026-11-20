@@ -8,18 +8,21 @@ import androidx.navigation3.runtime.NavKey
 import kotlin.reflect.KClass
 
 class NavigatorMetadataDecorator<T : NavKey>(clz: KClass<T>) : NavEntryDecorator<T>(
-    decorate = {
+    decorate = { entry ->
         val navigator = Navigator.get(clz)
 
-        DisposableEffect(Unit) {
-            navigator.withMetadata { add(it.metadata) }
+        DisposableEffect(entry) {
+            val metadata = entry.metadata
+            navigator.withMetadata { add(metadata) }
 
             onDispose {
-                navigator.withMetadata { remove(it.metadata) }
+                navigator.withMetadata {
+                    indexOfLast { it === metadata }.takeIf { it > -1 }?.let(::removeAt)
+                }
             }
         }
 
-        it.Content()
+        entry.Content()
     }
 )
 
