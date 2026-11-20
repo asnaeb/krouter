@@ -2,9 +2,10 @@ package io.github.asnaeb.krouter
 
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.navigation3.runtime.NavKey
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,11 +17,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.also
 import kotlin.reflect.KClass
 
 class Navigator<Destination : NavKey> private constructor(
-    val backStack: MutableList<Destination>,
+    private val mutableBackStack: MutableList<Destination>,
     val limit: Int
 ) {
     private var job: Job? = null
@@ -31,12 +33,11 @@ class Navigator<Destination : NavKey> private constructor(
 
     private val listeners: MutableList<(NavigationEvent<Destination>) -> Boolean> = mutableListOf()
 
-    val loadingDestinations: StateFlow<List<Destination>> field = MutableStateFlow(emptyList())
+    val backStack: List<Destination> = mutableBackStack
 
-    val activeDestination: Destination by derivedStateOf { backStack.last() }
-
-    val isLoading: StateFlow<Boolean> = loadingDestinations.map { it.isNotEmpty() }
-        .stateIn(scope, SharingStarted.Eagerly, false)
+    val metadata: List<Map<String, Any>> field = mutableStateListOf()
+    val loadingDestinations: List<Destination> field = mutableStateListOf()
+    val isLoading: Boolean by derivedStateOf { loadingDestinations.isNotEmpty() }
 
     @Suppress("UNCHECKED_CAST")
     internal fun <T : Destination> registerDestination(
@@ -46,11 +47,17 @@ class Navigator<Destination : NavKey> private constructor(
         data[clz] = DestinationData(beforeNavigate = beforeNavigate) as DestinationData<Destination>
     }
 
-    fun canGoBack(): Boolean = backStack.size > 1
+    internal fun withMetadata(block: SnapshotStateList<Map<String, Any>>.() -> Unit) {
+        Snapshot.withMutableSnapshot {
+            metadata.apply(block)
+        }
+    }
+
+    fun canGoBack(): Boolean = mutableBackStack.size > 1
 
     fun onBack() {
         if (canGoBack()) {
-            backStack.removeLast()
+            mutableBackStack.removeLast()
         }
     }
 
@@ -63,17 +70,17 @@ class Navigator<Destination : NavKey> private constructor(
     }
 
     fun navigate(handler: MutableList<Destination>.() -> Unit) {
-        val new: List<Destination> = backStack.toMutableList().apply(handler)
+        val new: List<Destination> = mutableBackStack.toMutableList().apply(handler)
 
         listeners.forEach { listener ->
-            val block: Boolean = listener(NavigationEvent(from = backStack, to = new))
+            val block: Boolean = listener(NavigationEvent(from = mutableBackStack, to = new))
 
             if (block) {
                 return@navigate
             }
         }
 
-        val newDestinations: List<Destination> = new.filter { it !in backStack }
+        val newDestinations: List<Destination> = new.filter { it !in mutableBackStack }
 
         job?.cancel()
 
@@ -83,11 +90,13 @@ class Navigator<Destination : NavKey> private constructor(
                     data[destination::class]?.beforeNavigate?.let { loader ->
                         launch {
                             try {
-                                loadingDestinations.update { it + destination }
-                                loader(destination)
+                                loadingDestinations += destination
+                                withContext(Dispatchers.Default) {
+                                    loader(destination)
+                                }
                             }
                             finally {
-                                loadingDestinations.update { it - destination }
+                                loadingDestinations -= destination
                             }
                         }
                     }
@@ -95,63 +104,8 @@ class Navigator<Destination : NavKey> private constructor(
             }
 
             Snapshot.withMutableSnapshot {
-                backStack.clear()
-                backStack.addAll(new)
-            }
-        }
-    }
-
-    fun navigate(to: Destination, replace: Boolean = false) {
-        if (activeDestination != to) {
-            job?.cancel()
-
-            job = scope.launch {
-                val prev: MutableList<Destination> = backStack.toMutableList()
-                val new: List<Destination> = prev.apply {
-                    if (replace) {
-                        set(lastIndex, to)
-                    }
-                    else {
-                        if (size + 1 > limit) {
-                            removeFirst()
-                        }
-
-                        add(to)
-                    }
-                }
-
-                listeners.forEach { listener ->
-                    val block: Boolean = listener(NavigationEvent(from = prev, to = new))
-
-                    if (block) {
-                        return@launch
-                    }
-                }
-
-                val targetDestinationData: DestinationData<Destination>? = data[to::class]
-
-                try {
-                    targetDestinationData?.beforeNavigate?.let { beforeNavigate ->
-                        loadingDestinations.update { it + to }
-                        beforeNavigate(to)
-                    }
-                }
-                catch (e: Exception) {
-                    if (e is CancellationException) {
-                        throw e
-                    }
-
-                    e.printStackTrace()
-                    return@launch
-                }
-                finally {
-                    loadingDestinations.update { it - to }
-                }
-
-                Snapshot.withMutableSnapshot {
-                    backStack.clear()
-                    backStack.addAll(new)
-                }
+                mutableBackStack.clear()
+                mutableBackStack.addAll(new)
             }
         }
     }
@@ -172,6 +126,9 @@ class Navigator<Destination : NavKey> private constructor(
         ): Navigator<Destination> {
             return Navigator(backStack, limit).also { instances[clz] = it }
         }
+
+        @Suppress("UNCHECKED_CAST")
+        internal fun <T : NavKey> get(clz: KClass<T>) = (instances[clz] ?: error(clz)) as Navigator<T>
 
         @Suppress("UNCHECKED_CAST")
         operator fun <T : NavKey> invoke(clz: KClass<T>): Navigator<T> = (instances[clz] ?: error(clz)) as Navigator<T>
