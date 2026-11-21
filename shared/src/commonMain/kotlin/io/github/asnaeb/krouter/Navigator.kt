@@ -55,6 +55,14 @@ class Navigator<Destination : NavKey> private constructor(
         }
     }
 
+    inline fun <reified T : Destination> metadata(destination: T): Map<String, Any> {
+        return destinations[T::class]?.metadata(destination) ?: emptyMap()
+    }
+
+    inline fun <reified T : Destination> isLoading(destination: T): Boolean {
+        return destination in loadingDestinations
+    }
+
     fun addNavigationListener(listener: (NavigationEvent<Destination>) -> Boolean) {
         listeners.add(listener)
     }
