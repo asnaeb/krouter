@@ -4,18 +4,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.also
@@ -27,30 +20,31 @@ class Navigator<Destination : NavKey> private constructor(
 ) {
     private var job: Job? = null
 
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(Dispatchers.Main.immediate)
 
-    private val data: MutableMap<KClass<out Destination>, DestinationData<Destination>> = mutableMapOf()
-
-    private val listeners: MutableList<(NavigationEvent<Destination>) -> Boolean> = mutableListOf()
+    private val listeners = mutableListOf<(NavigationEvent<Destination>) -> Boolean>()
 
     val backStack: List<Destination> = mutableBackStack
 
-    val metadata: List<Map<String, Any>> field = mutableStateListOf()
     val loadingDestinations: List<Destination> field = mutableStateListOf()
+
+    val destinations: Map<KClass<out Destination>, DestinationData<Destination>>
+        field = mutableMapOf()
+
     val isLoading: Boolean by derivedStateOf { loadingDestinations.isNotEmpty() }
 
     @Suppress("UNCHECKED_CAST")
     internal fun <T : Destination> registerDestination(
         clz: KClass<T>,
+        metadata: (T) -> Map<String, Any>,
         beforeNavigate: (suspend (T) -> Unit)?
     ) {
-        data[clz] = DestinationData(beforeNavigate = beforeNavigate) as DestinationData<Destination>
-    }
+        require(clz !in destinations) { "Destination already registered" }
 
-    internal fun withMetadata(block: SnapshotStateList<Map<String, Any>>.() -> Unit) {
-        Snapshot.withMutableSnapshot {
-            metadata.apply(block)
-        }
+        destinations[clz] = DestinationData(
+            beforeNavigate = beforeNavigate,
+            metadata = metadata
+        ) as DestinationData<Destination>
     }
 
     fun canGoBack(): Boolean = mutableBackStack.size > 1
@@ -80,14 +74,14 @@ class Navigator<Destination : NavKey> private constructor(
             }
         }
 
-        val newDestinations: List<Destination> = new.filter { it !in mutableBackStack }
+        val newDestinations: Set<Destination> = new.subtract(mutableBackStack.toSet())
 
         job?.cancel()
 
         job = scope.launch {
             coroutineScope {
                 newDestinations.forEach { destination ->
-                    data[destination::class]?.beforeNavigate?.let { loader ->
+                    destinations[destination::class]?.beforeNavigate?.let { loader ->
                         launch {
                             try {
                                 loadingDestinations += destination
@@ -126,9 +120,6 @@ class Navigator<Destination : NavKey> private constructor(
         ): Navigator<Destination> {
             return Navigator(backStack, limit).also { instances[clz] = it }
         }
-
-        @Suppress("UNCHECKED_CAST")
-        internal fun <T : NavKey> get(clz: KClass<T>) = (instances[clz] ?: error(clz)) as Navigator<T>
 
         @Suppress("UNCHECKED_CAST")
         operator fun <T : NavKey> invoke(clz: KClass<T>): Navigator<T> = (instances[clz] ?: error(clz)) as Navigator<T>

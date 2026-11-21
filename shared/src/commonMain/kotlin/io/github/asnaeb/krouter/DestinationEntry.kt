@@ -71,7 +71,7 @@ fun <P : NavKey, T : P> DestinationEntry<T>.registerEntry(
     navigator: Navigator<P>,
     scope: EntryProviderScope<P>
 ) {
-    navigator.registerDestination(clazz, ::loader)
+    navigator.registerDestination(clazz, ::metadata, ::loader)
 
     scope.addEntryProvider(
         clazz = clazz,
