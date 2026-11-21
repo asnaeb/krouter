@@ -28,8 +28,9 @@ class Navigator<Destination : NavKey> private constructor(
 
     val loadingDestinations: List<Destination> field = mutableStateListOf()
 
-    val destinations: Map<KClass<out Destination>, DestinationData<Destination>>
-        field = mutableMapOf()
+    private val _destinations = mutableMapOf<KClass<out Destination>, DestinationData<Destination>>()
+
+    val destinations = _destinations.values.toList()
 
     val isLoading: Boolean by derivedStateOf { loadingDestinations.isNotEmpty() }
 
@@ -39,9 +40,9 @@ class Navigator<Destination : NavKey> private constructor(
         metadata: (T) -> Map<String, Any>,
         beforeNavigate: (suspend (T) -> Unit)?
     ) {
-        require(clz !in destinations) { "Destination already registered" }
+        require(clz !in _destinations) { "Destination already registered" }
 
-        destinations[clz] = DestinationData(
+        _destinations[clz] = DestinationData(
             beforeNavigate = beforeNavigate,
             metadata = metadata
         ) as DestinationData<Destination>
@@ -55,8 +56,8 @@ class Navigator<Destination : NavKey> private constructor(
         }
     }
 
-    inline fun <reified T : Destination> metadata(destination: T): Map<String, Any> {
-        return destinations[T::class]?.metadata(destination) ?: emptyMap()
+    fun metadata(destination: Destination): Map<String, Any> {
+        return _destinations[destination::class]?.metadata(destination) ?: emptyMap()
     }
 
     inline fun <reified T : Destination> isLoading(destination: T): Boolean {
@@ -89,7 +90,7 @@ class Navigator<Destination : NavKey> private constructor(
         job = scope.launch {
             coroutineScope {
                 newDestinations.forEach { destination ->
-                    destinations[destination::class]?.beforeNavigate?.let { loader ->
+                    _destinations[destination::class]?.beforeNavigate?.let { loader ->
                         launch {
                             try {
                                 loadingDestinations += destination
