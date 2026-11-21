@@ -23,8 +23,9 @@ class JvmTest {
     @Serializable
     data object Dest4 : Destination
 
-    object Dest3Entry : DestinationEntry<Dest3> by destination({
-        content {
+    object Dest3Entry : DestinationEntry<Dest3> by DestinationEntry(
+        loader = { "hello" },
+        content = { dest3, string ->
             DisposableEffect(Unit) {
                 println("Dest3 entered composition")
                 onDispose {
@@ -32,9 +33,9 @@ class JvmTest {
                 }
             }
         }
-    })
+    )
 
-    object Dest4Entry : DestinationEntry<Dest4> {
+    object Dest4Entry : PlainDestinationEntry<Dest4> {
         override val clazz = Dest4::class
 
         @Composable
@@ -48,26 +49,22 @@ class JvmTest {
         }
     }
 
-    val dest1Entry = destination<Dest1> {
-        content {
-            DisposableEffect(Unit) {
-                println("${it::class.simpleName} entered composition")
+    val dest1Entry = DestinationEntry<Dest1> {
+        DisposableEffect(Unit) {
+            println("${it::class.simpleName} entered composition")
 
-                onDispose {
-                    println("${it::class.simpleName} exited composition")
-                }
+            onDispose {
+                println("${it::class.simpleName} exited composition")
             }
         }
     }
 
-    val dest2Entry = destination<Dest2> {
-        content {
-            DisposableEffect(Unit) {
-                println("Dest2 entered composition")
+    val dest2Entry = DestinationEntry<Dest2> {
+        DisposableEffect(Unit) {
+            println("Dest2 entered composition")
 
-                onDispose {
-                    println("Dest2 exited composition")
-                }
+            onDispose {
+                println("Dest2 exited composition")
             }
         }
     }

@@ -1,8 +1,10 @@
 package io.github.asnaeb.krouter
 
 import androidx.navigation3.runtime.NavKey
+import kotlin.reflect.KClass
 
 class DestinationData<Destination : NavKey>(
-    val beforeNavigate: (suspend (Destination) -> Unit)?,
-    val metadata: (Destination) -> Map<String, Any>
+    internal val beforeNavigate: (suspend (Destination) -> Any?)?,
+    val metadata: (Destination) -> Map<String, Any>,
+    val clazz: KClass<Destination>
 )

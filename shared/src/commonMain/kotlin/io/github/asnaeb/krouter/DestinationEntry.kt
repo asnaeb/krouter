@@ -1,77 +1,91 @@
 package io.github.asnaeb.krouter
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.navigation3.runtime.EntryProviderScope
-import androidx.navigation3.runtime.MetadataScope
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import kotlin.reflect.KClass
 
-interface DestinationEntry<T : NavKey> {
-    val clazz: KClass<T>
+interface DestinationEntry<Destination : NavKey> {
+    val clazz: KClass<Destination>
 
-    suspend fun loader(destination: T) {}
-
-    @Composable
-    fun Content(destination: T) {}
-
-
-    fun metadata(destination: T): Map<String, Any> = emptyMap()
+    fun metadata(destination: Destination): Map<String, Any> = emptyMap()
 }
 
-@DslMarker
-annotation class DestinationEntryDsl
+interface PlainDestinationEntry<Destination : NavKey> : DestinationEntry<Destination> {
+    @Composable
+    fun Content(destination: Destination) {}
+}
 
-@DestinationEntryDsl
-class DestinationEntryBuilder<T : NavKey>(override val clazz: KClass<T>) : DestinationEntry<T> {
-    private var _loader: (suspend (T) -> Unit)? = null
+interface DataDestinationEntry<Destination : NavKey, Data> : DestinationEntry<Destination> {
+    suspend fun beforeNavigate(destination: Destination): Data
 
-    private var _content: @Composable ((T) -> Unit) = {}
+    @Composable
+    fun Content(destination: Destination, data: Data) {}
+}
 
-    private var _metadata: (T) -> Map<String, Any> = { emptyMap() }
+inline fun <reified Destination : NavKey> DestinationEntry(
+    noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
+    noinline content: @Composable (Destination) -> Unit = {}
+): DestinationEntry<Destination> = object : PlainDestinationEntry<Destination> {
+    override val clazz: KClass<Destination> = Destination::class
 
-    fun loader(loader: suspend (T) -> Unit) {
-        _loader = loader
-    }
-
-    fun content(content: @Composable (T) -> Unit) {
-        _content = content
-    }
-
-    fun metadata(metadata: (T) -> Map<String, Any>) {
-        _metadata = metadata
-    }
-
-    fun buildMetadata(builder: MetadataScope.(T) -> Unit) {
-        _metadata = { androidx.navigation3.runtime.metadata { builder(it) } }
+    override fun metadata(destination: Destination): Map<String, Any> {
+        return metadata(destination)
     }
 
     @Composable
-    override fun Content(destination: T) {
-        _content(destination)
-    }
-
-    override suspend fun loader(destination: T) {
-        _loader?.invoke(destination)
-    }
-
-    override fun metadata(destination: T): Map<String, Any> {
-        return _metadata(destination)
+    override fun Content(destination: Destination) {
+        content(destination)
     }
 }
 
-inline fun <reified T : NavKey> destination(block: DestinationEntryBuilder<T>.() -> Unit): DestinationEntry<T> {
-    return DestinationEntryBuilder(T::class).apply(block)
+inline fun <reified Destination : NavKey, Data> DestinationEntry(
+    noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
+    noinline loader: (Destination) -> Data,
+    noinline content: @Composable (Destination, Data) -> Unit = { _, _ -> }
+): DestinationEntry<Destination> = object : DataDestinationEntry<Destination, Data> {
+    override val clazz: KClass<Destination> = Destination::class
+
+    override fun metadata(destination: Destination): Map<String, Any> {
+        return metadata(destination)
+    }
+
+    override suspend fun beforeNavigate(destination: Destination): Data = loader(destination)
+
+    @Composable
+    override fun Content(destination: Destination, data: Data) {
+        content(destination, data)
+    }
 }
+
+inline fun <reified Destination : NavKey> DestinationEntry(
+    noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
+    noinline loader: (Destination) -> Unit,
+    noinline content: @Composable (Destination) -> Unit = { }
+): DestinationEntry<Destination> = DestinationEntry<Destination, Unit>(
+    metadata = metadata,
+    loader = loader,
+    content = { destination, _ ->  content(destination) }
+)
 
 @OptIn(InternalSerializationApi::class)
 fun <P : NavKey, T : P> DestinationEntry<T>.registerEntry(
     navigator: Navigator<P>,
     scope: EntryProviderScope<P>
 ) {
-    navigator.registerDestination(clazz, ::metadata, ::loader)
+    val loader = if (this is DataDestinationEntry<T, *>) {
+        ::beforeNavigate
+    }
+    else {
+        null
+    }
+
+    navigator.registerDestination(clazz, ::metadata, loader)
 
     scope.addEntryProvider(
         clazz = clazz,
@@ -82,6 +96,28 @@ fun <P : NavKey, T : P> DestinationEntry<T>.registerEntry(
                 JsonNavEntry(it)
             )
         },
-        content = ::Content
+        content = when (this) {
+            is DataDestinationEntry<T, *> -> {
+                @Composable { destination: T ->
+                    @Suppress("UNCHECKED_CAST")
+                    (::Content as? @Composable (T, Any?) -> Unit)?.invoke(
+                        destination,
+                        navigator.getLoaderData(destination)
+                    )
+
+                    DisposableEffect(destination) {
+                        onDispose {
+                            navigator.clearLoaderData(destination)
+                        }
+                    }
+                }
+            }
+
+            is PlainDestinationEntry<T> -> {
+                @Composable { destination: T -> Content(destination) }
+            }
+
+            else -> { @Composable { } }
+        }
     )
 }

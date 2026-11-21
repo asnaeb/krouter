@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.also
 import kotlin.reflect.KClass
 
@@ -24,29 +23,38 @@ class Navigator<Destination : NavKey> private constructor(
 
     private val listeners = mutableListOf<(NavigationEvent<Destination>) -> Boolean>()
 
-    val backStack: List<Destination> = mutableBackStack
-
-    val loadingDestinations: List<Destination> field = mutableStateListOf()
-
     private val _destinations = mutableMapOf<KClass<out Destination>, DestinationData<Destination>>()
+
+    private val loaderData = mutableMapOf<Destination, Any?>()
 
     val destinations = _destinations.values.toList()
 
-    val isLoading: Boolean by derivedStateOf { loadingDestinations.isNotEmpty() }
+    val backStack: List<Destination> = mutableBackStack
+
+    val loading: List<Destination> field = mutableStateListOf()
+
+    val isLoading: Boolean by derivedStateOf { loading.isNotEmpty() }
 
     @Suppress("UNCHECKED_CAST")
     internal fun <T : Destination> registerDestination(
         clz: KClass<T>,
         metadata: (T) -> Map<String, Any>,
-        beforeNavigate: (suspend (T) -> Unit)?
+        beforeNavigate: (suspend (T) -> Any?)?
     ) {
         require(clz !in _destinations) { "Destination already registered" }
 
         _destinations[clz] = DestinationData(
+            clazz = clz,
             beforeNavigate = beforeNavigate,
             metadata = metadata
         ) as DestinationData<Destination>
     }
+
+    internal fun clearLoaderData(destination: Destination) {
+        loaderData.remove(destination)
+    }
+
+    internal fun getLoaderData(destination: Destination) = loaderData[destination]
 
     fun canGoBack(): Boolean = mutableBackStack.size > 1
 
@@ -61,7 +69,7 @@ class Navigator<Destination : NavKey> private constructor(
     }
 
     inline fun <reified T : Destination> isLoading(destination: T): Boolean {
-        return destination in loadingDestinations
+        return destination in loading
     }
 
     fun addNavigationListener(listener: (NavigationEvent<Destination>) -> Boolean) {
@@ -88,27 +96,27 @@ class Navigator<Destination : NavKey> private constructor(
         job?.cancel()
 
         job = scope.launch {
-            coroutineScope {
-                newDestinations.forEach { destination ->
-                    _destinations[destination::class]?.beforeNavigate?.let { loader ->
-                        launch {
-                            try {
-                                loadingDestinations += destination
-                                withContext(Dispatchers.Default) {
-                                    loader(destination)
-                                }
-                            }
-                            finally {
-                                loadingDestinations -= destination
+            try {
+                coroutineScope {
+                    newDestinations.forEach { destination ->
+                        _destinations[destination::class]?.beforeNavigate?.let { loader ->
+                            launch {
+                                loading += destination
+                                loaderData[destination] = loader(destination)
                             }
                         }
                     }
                 }
-            }
 
-            Snapshot.withMutableSnapshot {
-                mutableBackStack.clear()
-                mutableBackStack.addAll(new)
+                Snapshot.withMutableSnapshot {
+                    mutableBackStack.clear()
+                    mutableBackStack.addAll(new)
+                }
+            }
+            finally {
+                Snapshot.withMutableSnapshot {
+                    newDestinations.forEach(loading::minusAssign)
+                }
             }
         }
     }
