@@ -1,6 +1,7 @@
 package io.github.asnaeb.krouter
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
@@ -36,13 +37,15 @@ fun <T : NavKey> rememberBackStack(
         *initialEntries
     ) as NavBackStack<T>
 
-    return backStack.also {
+    SideEffect(Unit) {
         Navigator.create(
             clz = destination,
             backStack = backStack,
             limit = limit
         )
     }
+
+    return backStack
 }
 
 @Composable

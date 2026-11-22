@@ -127,12 +127,15 @@ class Navigator<Destination : NavKey> private constructor(
         """.replace("\n", " ").trimIndent()
         )
 
+        @Suppress("UNCHECKED_CAST")
         internal fun <Destination : NavKey> create(
             clz: KClass<Destination>,
             backStack: MutableList<Destination>,
             limit: Int
         ): Navigator<Destination> {
-            return Navigator(backStack, limit).also { instances[clz] = it }
+            return instances.getOrPut(clz) {
+                Navigator(backStack, limit).also { instances[clz] = it }
+            } as Navigator<Destination>
         }
 
         @Suppress("UNCHECKED_CAST")
