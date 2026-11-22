@@ -96,27 +96,24 @@ class Navigator<Destination : NavKey> private constructor(
         job?.cancel()
 
         job = scope.launch {
-            try {
-                coroutineScope {
-                    newDestinations.forEach { destination ->
-                        _destinations[destination::class]?.beforeNavigate?.let { loader ->
-                            launch {
-                                loading += destination
-                                loaderData[destination] = loader(destination)
-                            }
+            coroutineScope {
+                newDestinations.forEach { destination ->
+                    _destinations[destination::class]?.beforeNavigate?.let { loader ->
+                        launch {
+                            loading += destination
+                            loaderData[destination] = loader(destination)
                         }
                     }
                 }
-
-                Snapshot.withMutableSnapshot {
-                    mutableBackStack.clear()
-                    mutableBackStack.addAll(new)
-                }
             }
-            finally {
-                Snapshot.withMutableSnapshot {
-                    newDestinations.forEach(loading::minusAssign)
-                }
+
+            Snapshot.withMutableSnapshot {
+                mutableBackStack.clear()
+                mutableBackStack.addAll(new)
+            }
+
+            Snapshot.withMutableSnapshot {
+                newDestinations.forEach(loading::minusAssign)
             }
         }
     }

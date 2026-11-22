@@ -46,7 +46,7 @@ inline fun <reified Destination : NavKey> DestinationEntry(
 
 inline fun <reified Destination : NavKey, Data> DestinationEntry(
     noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
-    noinline loader: (Destination) -> Data,
+    noinline loader: suspend (Destination) -> Data,
     noinline content: @Composable (Destination, Data) -> Unit = { _, _ -> }
 ): DestinationEntry<Destination> = object : DataDestinationEntry<Destination, Data> {
     override val clazz: KClass<Destination> = Destination::class
@@ -65,7 +65,7 @@ inline fun <reified Destination : NavKey, Data> DestinationEntry(
 
 inline fun <reified Destination : NavKey> DestinationEntry(
     noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
-    noinline loader: (Destination) -> Unit,
+    noinline loader: suspend (Destination) -> Unit,
     noinline content: @Composable (Destination) -> Unit = { }
 ): DestinationEntry<Destination> = DestinationEntry<Destination, Unit>(
     metadata = metadata,
