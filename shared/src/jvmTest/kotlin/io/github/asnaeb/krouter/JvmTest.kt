@@ -35,20 +35,6 @@ class JvmTest {
         }
     )
 
-    object Dest4Entry : PlainDestinationEntry<Dest4> {
-        override val clazz = Dest4::class
-
-        @Composable
-        override fun Content(destination: Dest4) {
-            DisposableEffect(Unit) {
-                println("Dest4 entered composition")
-                onDispose {
-                    println("Dest4 exited composition")
-                }
-            }
-        }
-    }
-
     val dest1Entry = DestinationEntry<Dest1> {
         DisposableEffect(Unit) {
             println("${it::class.simpleName} entered composition")
@@ -77,7 +63,7 @@ class JvmTest {
         setContent {
             NavDisplay(
                 backStack = rememberBackStack<Destination>(Dest1, limit = 10),
-                entryProvider = rememberEntryProvider(entries = listOf(dest1Entry, dest2Entry, Dest3Entry, Dest4Entry)),
+                entryProvider = rememberEntryProvider(entries = listOf(dest1Entry, dest2Entry, Dest3Entry)),
             )
 
             LaunchedEffect(Unit) {

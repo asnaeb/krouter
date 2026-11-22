@@ -13,33 +13,24 @@ import kotlin.reflect.KClass
 interface DestinationEntry<Destination : NavKey> {
     val clazz: KClass<Destination>
 
-    fun metadata(destination: Destination): Map<String, Any> = emptyMap()
-}
+    val beforeNavigate: (suspend (Destination) -> Any?)?
 
-interface PlainDestinationEntry<Destination : NavKey> : DestinationEntry<Destination> {
-    @Composable
-    fun Content(destination: Destination) {}
-}
+    val metadata: (Destination) -> Map<String, Any>
 
-interface DataDestinationEntry<Destination : NavKey, Data> : DestinationEntry<Destination> {
-    suspend fun beforeNavigate(destination: Destination): Data
-
-    @Composable
-    fun Content(destination: Destination, data: Data) {}
+    val content: @Composable (Destination, data: Any?) -> Unit
 }
 
 inline fun <reified Destination : NavKey> DestinationEntry(
     noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
     noinline content: @Composable (Destination) -> Unit = {}
-): DestinationEntry<Destination> = object : PlainDestinationEntry<Destination> {
+) = object : DestinationEntry<Destination> {
     override val clazz: KClass<Destination> = Destination::class
 
-    override fun metadata(destination: Destination): Map<String, Any> {
-        return metadata(destination)
-    }
+    override val beforeNavigate: (suspend (Destination) -> Any?)? = null
 
-    @Composable
-    override fun Content(destination: Destination) {
+    override val metadata = metadata
+
+    override val content = @Composable { destination: Destination, _: Any? ->
         content(destination)
     }
 }
@@ -48,18 +39,16 @@ inline fun <reified Destination : NavKey, Data> DestinationEntry(
     noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
     noinline loader: suspend (Destination) -> Data,
     noinline content: @Composable (Destination, Data) -> Unit = { _, _ -> }
-): DestinationEntry<Destination> = object : DataDestinationEntry<Destination, Data> {
+) = object : DestinationEntry<Destination> {
     override val clazz: KClass<Destination> = Destination::class
 
-    override fun metadata(destination: Destination): Map<String, Any> {
-        return metadata(destination)
-    }
+    override val metadata = metadata
 
-    override suspend fun beforeNavigate(destination: Destination): Data = loader(destination)
+    override val beforeNavigate: suspend (Destination) -> Data = { loader(it) }
 
-    @Composable
-    override fun Content(destination: Destination, data: Data) {
-        content(destination, data)
+    override val content = @Composable { destination: Destination, data: Any? ->
+        @Suppress("UNCHECKED_CAST")
+        content(destination, data as Data)
     }
 }
 
@@ -78,46 +67,25 @@ fun <P : NavKey, T : P> DestinationEntry<T>.registerEntry(
     navigator: Navigator<P>,
     scope: EntryProviderScope<P>
 ) {
-    val loader = if (this is DataDestinationEntry<T, *>) {
-        ::beforeNavigate
-    }
-    else {
-        null
-    }
-
-    navigator.registerDestination(clazz, ::metadata, loader)
+    navigator.registerDestination(clazz, metadata, beforeNavigate)
 
     scope.addEntryProvider(
         clazz = clazz,
-        metadata = ::metadata,
+        metadata = metadata,
         clazzContentKey = {
             Json.encodeToString(
                 JsonNavEntry.serializer(clazz.serializer()),
                 JsonNavEntry(it)
             )
         },
-        content = when (this) {
-            is DataDestinationEntry<T, *> -> {
-                @Composable { destination: T ->
-                    @Suppress("UNCHECKED_CAST")
-                    (::Content as? @Composable (T, Any?) -> Unit)?.invoke(
-                        destination,
-                        navigator.getLoaderData(destination)
-                    )
+        content = { destination: T ->
+            content(destination, navigator.getLoaderData(destination))
 
-                    DisposableEffect(destination) {
-                        onDispose {
-                            navigator.clearLoaderData(destination)
-                        }
-                    }
+            DisposableEffect(destination) {
+                onDispose {
+                    navigator.clearLoaderData(destination)
                 }
             }
-
-            is PlainDestinationEntry<T> -> {
-                @Composable { destination: T -> Content(destination) }
-            }
-
-            else -> { @Composable { } }
         }
     )
 }
