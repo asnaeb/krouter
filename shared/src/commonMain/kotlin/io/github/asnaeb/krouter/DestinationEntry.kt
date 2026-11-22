@@ -56,7 +56,7 @@ inline fun <reified Destination : NavKey> DestinationEntry(
     noinline metadata: (Destination) -> Map<String, Any> = { emptyMap() },
     noinline loader: suspend (Destination) -> Unit,
     noinline content: @Composable (Destination) -> Unit = { }
-): DestinationEntry<Destination> = DestinationEntry<Destination, Unit>(
+): DestinationEntry<Destination> = DestinationEntry<Destination, Any?>(
     metadata = metadata,
     loader = loader,
     content = { destination, _ ->  content(destination) }
