@@ -3,10 +3,16 @@ package io.github.asnaeb.krouter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.NavDisplay
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 
@@ -61,6 +67,8 @@ class JvmTest {
     @Test
     fun testApp() = runComposeUiTest {
         setContent {
+            var state by remember { mutableStateOf(false) }
+
             NavDisplay(
                 backStack = rememberBackStack<Destination>(Dest1, limit = 10),
                 entryProvider = rememberEntryProvider(entries = listOf(dest1Entry, dest2Entry, Dest3Entry)),

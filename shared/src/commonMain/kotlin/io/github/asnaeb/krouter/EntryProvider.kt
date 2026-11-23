@@ -11,7 +11,7 @@ inline fun <reified T : NavKey> rememberEntryProvider(
     navigator: Navigator<T> = Navigator<T>(),
     entries: List<DestinationEntry<out T>>
 ): (T) -> NavEntry<T> {
-    return remember(entries, navigator) {
+    return remember {
         entryProvider {
             entries.forEach {
                 it.registerEntry(

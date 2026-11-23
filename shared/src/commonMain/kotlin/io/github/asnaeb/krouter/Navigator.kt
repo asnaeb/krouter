@@ -133,9 +133,7 @@ class Navigator<Destination : NavKey> private constructor(
             backStack: MutableList<Destination>,
             limit: Int
         ): Navigator<Destination> {
-            return instances.getOrPut(clz) {
-                Navigator(backStack, limit).also { instances[clz] = it }
-            } as Navigator<Destination>
+            return instances.getOrPut(clz) { Navigator(backStack, limit) } as Navigator<Destination>
         }
 
         @Suppress("UNCHECKED_CAST")
