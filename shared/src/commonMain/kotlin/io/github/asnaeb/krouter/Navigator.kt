@@ -1,21 +1,28 @@
 package io.github.asnaeb.krouter
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.also
 import kotlin.reflect.KClass
+import kotlin.time.Duration
 
 class Navigator<Destination : NavKey> private constructor(
     private val mutableBackStack: MutableList<Destination>,
-    val limit: Int
+    private val loadingDelay: Duration,
+    private val onBack: MutableList<Destination>.() -> Unit
 ) {
     private var job: Job? = null
 
@@ -35,13 +42,17 @@ class Navigator<Destination : NavKey> private constructor(
 
     val isLoading: Boolean by derivedStateOf { loading.isNotEmpty() }
 
+    fun onBack() {
+        onBack.invoke(mutableBackStack)
+    }
+
     @Suppress("UNCHECKED_CAST")
     internal fun <T : Destination> registerDestination(
         clz: KClass<T>,
         metadata: (T) -> Map<String, Any>,
         beforeNavigate: (suspend (T) -> Any?)?
     ) {
-        require(clz !in _destinations) { "Destination already registered" }
+        require(clz !in _destinations) { "Destination ${clz}::class already registered" }
 
         _destinations[clz] = DestinationData(
             clazz = clz,
@@ -55,14 +66,6 @@ class Navigator<Destination : NavKey> private constructor(
     }
 
     internal fun getLoaderData(destination: Destination) = loaderData[destination]
-
-    fun canGoBack(): Boolean = mutableBackStack.size > 1
-
-    fun onBack() {
-        if (canGoBack()) {
-            mutableBackStack.removeLast()
-        }
-    }
 
     fun metadata(destination: Destination): Map<String, Any> {
         return _destinations[destination::class]?.metadata(destination) ?: emptyMap()
@@ -100,8 +103,20 @@ class Navigator<Destination : NavKey> private constructor(
                 newDestinations.forEach { destination ->
                     _destinations[destination::class]?.beforeNavigate?.let { loader ->
                         launch {
-                            loading += destination
-                            loaderData[destination] = loader(destination)
+                            val loadingJob = launch {
+                                if (loadingDelay > Duration.ZERO) {
+                                    delay(loadingDelay)
+                                }
+
+                                loading += destination
+                            }
+
+                            try {
+                                loaderData[destination] = loader(destination)
+                            }
+                            finally {
+                                loadingJob.cancel()
+                            }
                         }
                     }
                 }
@@ -128,17 +143,51 @@ class Navigator<Destination : NavKey> private constructor(
         )
 
         @Suppress("UNCHECKED_CAST")
-        internal fun <Destination : NavKey> create(
+        fun <Destination : NavKey> create(
             clz: KClass<Destination>,
             backStack: MutableList<Destination>,
-            limit: Int
+            loadingDelay: Duration,
+            onBack: MutableList<Destination>.() -> Unit
         ): Navigator<Destination> {
-            return instances.getOrPut(clz) { Navigator(backStack, limit) } as Navigator<Destination>
+            require(clz !in instances) { "Navigator for ${clz.simpleName}::class already registered" }
+
+            return instances.getOrPut(clz) {
+                Navigator(
+                    mutableBackStack = backStack,
+                    loadingDelay = loadingDelay,
+                    onBack = onBack
+                )
+            } as Navigator<Destination>
         }
+
+        inline fun <reified Destination : NavKey> create(
+            backStack: MutableList<Destination>,
+            loadingDelay: Duration,
+            noinline onBack: MutableList<Destination>.() -> Unit
+        ) = create(
+            clz = Destination::class,
+            backStack = backStack,
+            loadingDelay = loadingDelay,
+            onBack = onBack
+        )
 
         @Suppress("UNCHECKED_CAST")
         operator fun <T : NavKey> invoke(clz: KClass<T>): Navigator<T> = (instances[clz] ?: error(clz)) as Navigator<T>
 
         inline operator fun <reified T : NavKey> invoke(): Navigator<T> = Navigator(T::class)
     }
+}
+
+@Composable
+inline fun <reified Destination : NavKey> rememberNavigator(
+    backStack: MutableList<Destination>,
+    loadingDelay: Duration,
+    noinline onBack: MutableList<Destination>.() -> Unit
+): Navigator<Destination> = remember {
+    Navigator.create(
+        clz = Destination::class,
+        backStack = backStack,
+        loadingDelay = loadingDelay,
+        onBack = onBack
+    )
 }

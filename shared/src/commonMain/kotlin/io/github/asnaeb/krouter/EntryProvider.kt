@@ -8,7 +8,7 @@ import androidx.navigation3.runtime.entryProvider
 
 @Composable
 inline fun <reified T : NavKey> rememberEntryProvider(
-    navigator: Navigator<T> = Navigator<T>(),
+    navigator: Navigator<T>,
     entries: List<DestinationEntry<out T>>
 ): (T) -> NavEntry<T> {
     return remember {

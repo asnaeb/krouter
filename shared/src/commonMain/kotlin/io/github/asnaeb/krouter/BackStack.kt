@@ -19,7 +19,6 @@ import kotlin.reflect.KClass
 @Composable
 fun <T : NavKey> rememberBackStack(
     destination: KClass<T>,
-    limit: Int,
     vararg initialEntries: T
 ): NavBackStack<T> {
     val configuration = remember {
@@ -38,20 +37,11 @@ fun <T : NavKey> rememberBackStack(
         *initialEntries
     ) as NavBackStack<T>
 
-    return backStack.also {
-        key(Unit) {
-            Navigator.create(
-                clz = destination,
-                backStack = backStack,
-                limit = limit
-            )
-        }
-    }
+    return backStack
 }
 
 @Composable
 inline fun <reified T : NavKey> rememberBackStack(
-    vararg initialEntries: T,
-    limit: Int = Int.MAX_VALUE
+    vararg initialEntries: T
 ): NavBackStack<T> =
-    rememberBackStack(destination = T::class, limit = limit, initialEntries = initialEntries)
+    rememberBackStack(destination = T::class, initialEntries = initialEntries)
