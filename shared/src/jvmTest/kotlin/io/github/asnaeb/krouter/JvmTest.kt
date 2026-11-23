@@ -67,11 +67,15 @@ class JvmTest {
     @Test
     fun testApp() = runComposeUiTest {
         setContent {
-            var state by remember { mutableStateOf(false) }
+            val router = rememberKRouter<Destination>(
+                destinations = listOf(dest1Entry, dest2Entry, Dest3Entry),
+                initialEntries = listOf(Dest1)
+            )
 
             NavDisplay(
-                backStack = rememberBackStack<Destination>(Dest1, limit = 10),
-                entryProvider = rememberEntryProvider(entries = listOf(dest1Entry, dest2Entry, Dest3Entry)),
+                backStack = router.backStack,
+                entryProvider = router.entryProvider,
+                onBack = router.navigator::onBack
             )
 
             LaunchedEffect(Unit) {

@@ -7,7 +7,7 @@ import kotlin.time.Duration
 
 @Composable
 inline fun <reified Destination : NavKey> rememberKRouter(
-    destinations: List<DestinationEntry<Destination>>,
+    destinations: List<DestinationEntry<out Destination>>,
     initialEntries: List<Destination>,
     loadingDelay: Duration = Duration.ZERO,
     noinline onBack: MutableList<Destination>.() -> Unit = { removeLastOrNull() }
